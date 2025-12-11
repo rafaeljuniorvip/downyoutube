@@ -15,6 +15,15 @@ CORS(app)
 DOWNLOAD_FOLDER = Path("downloads")
 DOWNLOAD_FOLDER.mkdir(exist_ok=True)
 
+COOKIES_FILE = Path("cookies.txt")
+
+
+def get_cookies_opts():
+    """Retorna opções de cookies se o arquivo existir"""
+    if COOKIES_FILE.exists():
+        return {'cookiefile': str(COOKIES_FILE)}
+    return {}
+
 # Armazena o progresso dos downloads
 download_progress = {}
 
@@ -52,6 +61,7 @@ def get_video_info(url):
         'quiet': True,
         'no_warnings': True,
         'extract_flat': 'in_playlist',
+        **get_cookies_opts(),
     }
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -76,6 +86,7 @@ def download_single_video(url, task_id, output_path=None):
             'progress_hooks': [lambda d: progress_hook(d, task_id)],
             'quiet': True,
             'no_warnings': True,
+            **get_cookies_opts(),
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

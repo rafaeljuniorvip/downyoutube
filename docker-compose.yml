@@ -7,6 +7,7 @@ services:
       - minha_rede
     volumes:
       - downloads:/app/downloads
+      - ./cookies.txt:/app/cookies.txt:ro
     deploy:
       mode: replicated
       replicas: 1
