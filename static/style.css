@@ -730,6 +730,12 @@ footer {
     text-decoration: underline;
 }
 
+.extension-link {
+    display: inline-block;
+    margin-bottom: 15px;
+    text-decoration: none;
+}
+
 .cookies-steps {
     color: var(--text-secondary);
     font-size: 0.9rem;
