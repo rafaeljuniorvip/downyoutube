@@ -276,6 +276,31 @@ function resetDownload() {
     currentUrl = null;
 }
 
+async function addCurrentToQueue() {
+    if (!currentUrl) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: [currentUrl], cookies: getSavedCookies() })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Erro ao adicionar a fila');
+        }
+
+        // Show success and reset
+        alert('Adicionado a fila! Veja na secao "Fila de Downloads".');
+        resetDownload();
+        loadQueue(); // Update queue badge
+    } catch (error) {
+        showError('errorMessage', error.message);
+    }
+}
+
 // ============================================
 // Queue Section
 // ============================================
@@ -584,6 +609,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.getElementById('downloadBtn').addEventListener('click', startDownload);
     document.getElementById('downloadPlaylistBtn').addEventListener('click', startDownload);
+    document.getElementById('addVideoToQueueBtn').addEventListener('click', addCurrentToQueue);
+    document.getElementById('addPlaylistToQueueBtn').addEventListener('click', addCurrentToQueue);
     document.getElementById('saveFileBtn').addEventListener('click', downloadFile);
     document.getElementById('newDownloadBtn').addEventListener('click', resetDownload);
 

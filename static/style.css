@@ -402,6 +402,16 @@ body {
     margin-top: 16px;
 }
 
+.btn-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.btn-row .btn {
+    flex: 1;
+}
+
 .btn-icon {
     font-size: 1.1em;
 }
