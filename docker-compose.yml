@@ -4,7 +4,7 @@ services:
   downyoutube:
     image: ghcr.io/rafaeljuniorvip/downyoutube:latest
     networks:
-      - traefik-public
+      - minha_rede
     volumes:
       - downloads:/app/downloads
     deploy:
@@ -26,5 +26,5 @@ volumes:
   downloads:
 
 networks:
-  traefik-public:
+  minha_rede:
     external: true
