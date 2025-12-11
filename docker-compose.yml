@@ -12,11 +12,11 @@ services:
       replicas: 1
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.downyoutube.rule=Host(`downyoutube.papelaria.vip`)"
         - "traefik.http.routers.downyoutube.entrypoints=websecure"
-        - "traefik.http.routers.downyoutube.tls=true"
-        - "traefik.http.routers.downyoutube.tls.certresolver=letsencrypt"
-        - "traefik.http.services.downyoutube.loadbalancer.server.port=5000"
+        - "traefik.http.routers.downyoutube.rule=Host(`downyoutube.papelaria.vip`)"
+        - "traefik.http.routers.downyoutube.service=downyoutube-service"
+        - "traefik.http.routers.downyoutube.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.downyoutube-service.loadbalancer.server.port=5000"
       restart_policy:
         condition: on-failure
         delay: 5s
