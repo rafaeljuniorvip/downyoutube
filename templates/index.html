@@ -3,192 +3,322 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube MP3 Downloader</title>
+    <title>DownYouTube - Gerenciador de Downloads</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>YouTube MP3 Downloader</h1>
-            <p class="subtitle">Baixe videos e playlists do YouTube em MP3</p>
-        </header>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">▶</span>
+                    <span class="logo-text">DownYouTube</span>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-section="download">
+                    <span class="nav-icon">⬇</span>
+                    <span class="nav-text">Novo Download</span>
+                </a>
+                <a href="#" class="nav-item" data-section="queue">
+                    <span class="nav-icon">☰</span>
+                    <span class="nav-text">Fila de Downloads</span>
+                    <span class="nav-badge" id="queueBadge">0</span>
+                </a>
+                <a href="#" class="nav-item" data-section="library">
+                    <span class="nav-icon">♫</span>
+                    <span class="nav-text">Biblioteca</span>
+                </a>
+                <a href="#" class="nav-item" data-section="settings">
+                    <span class="nav-icon">⚙</span>
+                    <span class="nav-text">Configuracoes</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="storage-info">
+                    <span class="storage-label">Arquivos baixados</span>
+                    <span class="storage-value" id="totalFiles">0</span>
+                </div>
+            </div>
+        </aside>
 
-        <main>
-            <!-- Cookies Config -->
-            <div class="cookies-section">
-                <button id="toggleCookies" class="btn btn-secondary btn-small">
-                    <span id="cookiesIcon">🔓</span> Configurar Cookies (opcional)
-                </button>
-                <div id="cookiesConfig" class="cookies-config hidden">
-                    <p class="cookies-help">
-                        Se o YouTube bloquear os downloads, você precisa fornecer seus cookies.
-                    </p>
-                    <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" class="btn btn-primary btn-small extension-link">
-                        Baixar Extensão de Cookies (Chrome)
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1 id="pageTitle">Novo Download</h1>
+                    <p class="header-subtitle" id="pageSubtitle">Baixe videos e playlists do YouTube em MP3</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-outline" id="toggleCookiesBtn">
+                        <span id="cookiesIcon">🔓</span> Cookies
+                    </button>
+                </div>
+            </header>
+
+            <!-- Cookies Panel -->
+            <div id="cookiesPanel" class="panel cookies-panel hidden">
+                <div class="panel-header">
+                    <h3>Configuracao de Cookies</h3>
+                    <button class="btn-close" id="closeCookiesPanel">&times;</button>
+                </div>
+                <div class="panel-body">
+                    <p class="text-muted">Se o YouTube bloquear os downloads, forneca seus cookies de autenticacao.</p>
+                    <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" class="btn btn-sm btn-primary mb-3">
+                        Baixar Extensao de Cookies (Chrome)
                     </a>
-                    <ol class="cookies-steps">
-                        <li>Instale a extensão clicando no botão acima</li>
-                        <li>Acesse youtube.com e faça login</li>
-                        <li>Clique na extensão e exporte os cookies</li>
-                        <li>Cole o conteúdo abaixo</li>
-                    </ol>
-                    <textarea
-                        id="cookiesInput"
-                        placeholder="# Netscape HTTP Cookie File
-.youtube.com	TRUE	/	TRUE	...
-..."
-                        rows="5"
-                    ></textarea>
-                    <div class="cookies-actions">
-                        <button id="saveCookiesBtn" class="btn btn-primary btn-small">Salvar Cookies</button>
-                        <button id="clearCookiesBtn" class="btn btn-secondary btn-small">Limpar</button>
-                        <span id="cookiesStatus" class="cookies-status"></span>
+                    <textarea id="cookiesInput" class="form-textarea" rows="4" placeholder="Cole seus cookies aqui..."></textarea>
+                    <div class="panel-actions">
+                        <button class="btn btn-primary" id="saveCookiesBtn">Salvar</button>
+                        <button class="btn btn-outline" id="clearCookiesBtn">Limpar</button>
+                        <span id="cookiesStatus" class="status-text"></span>
                     </div>
                 </div>
             </div>
 
-            <!-- Tabs -->
-            <div class="tabs">
-                <button class="tab active" data-tab="single">Download Simples</button>
-                <button class="tab" data-tab="batch">Batch (Multiplas URLs)</button>
-            </div>
-
-            <!-- Single Download Section -->
-            <section id="singleTab" class="download-section tab-content active">
-                <div class="input-group">
-                    <input
-                        type="text"
-                        id="urlInput"
-                        placeholder="Cole a URL do video ou playlist do YouTube..."
-                        autocomplete="off"
-                    >
-                    <button id="fetchBtn" class="btn btn-primary">
-                        <span class="btn-text">Buscar</span>
-                        <span class="btn-loader hidden"></span>
-                    </button>
-                </div>
-
-                <div id="errorMessage" class="error-message hidden"></div>
-
-                <div id="videoInfo" class="video-info hidden">
-                    <div class="video-card">
-                        <img id="thumbnail" src="" alt="Thumbnail" class="thumbnail">
-                        <div class="video-details">
-                            <h3 id="videoTitle"></h3>
-                            <p id="videoChannel" class="channel"></p>
-                            <p id="videoDuration" class="duration"></p>
+            <!-- Download Section -->
+            <section id="downloadSection" class="content-section active">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">URL do Video ou Playlist</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-row">
+                            <input type="text" id="urlInput" class="form-input" placeholder="https://www.youtube.com/watch?v=... ou playlist?list=...">
+                            <button id="fetchBtn" class="btn btn-primary">
+                                <span class="btn-text">Buscar</span>
+                                <span class="btn-loader hidden"></span>
+                            </button>
                         </div>
+                        <div id="errorMessage" class="alert alert-error hidden"></div>
                     </div>
-                    <button id="downloadBtn" class="btn btn-success btn-large">
-                        Baixar MP3
-                    </button>
                 </div>
 
-                <div id="playlistInfo" class="playlist-info hidden">
-                    <div class="playlist-header">
-                        <h3 id="playlistTitle"></h3>
-                        <p id="playlistCount" class="count"></p>
+                <!-- Video Info Card -->
+                <div id="videoInfoCard" class="card hidden">
+                    <div class="card-header">
+                        <h2 class="card-title">Informacoes do Video</h2>
                     </div>
-                    <div id="playlistVideos" class="playlist-videos"></div>
-                    <button id="downloadPlaylistBtn" class="btn btn-success btn-large">
-                        Baixar Toda Playlist
-                    </button>
-                </div>
-
-                <div id="progressSection" class="progress-section hidden">
-                    <h3 id="progressTitle">Baixando...</h3>
-                    <div class="progress-bar">
-                        <div id="progressFill" class="progress-fill"></div>
-                    </div>
-                    <p id="progressText" class="progress-text">0%</p>
-                    <p id="progressStatus" class="progress-status"></p>
-                </div>
-
-                <div id="downloadComplete" class="download-complete hidden">
-                    <div class="success-icon">✓</div>
-                    <h3>Download Completo!</h3>
-                    <p id="completedFilename"></p>
-                    <button id="saveFileBtn" class="btn btn-primary">
-                        Salvar Arquivo
-                    </button>
-                    <button id="newDownloadBtn" class="btn btn-secondary">
-                        Novo Download
-                    </button>
-                </div>
-            </section>
-
-            <!-- Batch Download Section -->
-            <section id="batchTab" class="download-section tab-content">
-                <div class="batch-input-section">
-                    <label for="batchUrls">Cole suas URLs (uma por linha):</label>
-                    <textarea
-                        id="batchUrls"
-                        placeholder="https://www.youtube.com/watch?v=...
-https://www.youtube.com/playlist?list=...
-https://youtu.be/..."
-                        rows="6"
-                    ></textarea>
-                    <div class="batch-actions">
-                        <span id="urlCount" class="url-count">0 URLs detectadas</span>
-                        <button id="addToQueueBtn" class="btn btn-success">
-                            <span class="btn-text">Adicionar a Fila</span>
-                            <span class="btn-loader hidden"></span>
+                    <div class="card-body">
+                        <div class="media-info">
+                            <img id="thumbnail" src="" alt="Thumbnail" class="media-thumbnail">
+                            <div class="media-details">
+                                <h3 id="videoTitle" class="media-title"></h3>
+                                <p id="videoChannel" class="media-meta"></p>
+                                <p id="videoDuration" class="media-meta"></p>
+                            </div>
+                        </div>
+                        <button id="downloadBtn" class="btn btn-success btn-lg btn-block">
+                            <span class="btn-icon">⬇</span> Baixar MP3
                         </button>
                     </div>
                 </div>
 
-                <div id="batchError" class="error-message hidden"></div>
+                <!-- Playlist Info Card -->
+                <div id="playlistInfoCard" class="card hidden">
+                    <div class="card-header">
+                        <h2 class="card-title">Playlist Encontrada</h2>
+                        <span class="badge badge-info" id="playlistCount">0 videos</span>
+                    </div>
+                    <div class="card-body">
+                        <h3 id="playlistTitle" class="playlist-title"></h3>
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">#</th>
+                                        <th>Titulo</th>
+                                        <th width="100">Duracao</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="playlistVideos"></tbody>
+                            </table>
+                        </div>
+                        <button id="downloadPlaylistBtn" class="btn btn-success btn-lg btn-block">
+                            <span class="btn-icon">⬇</span> Baixar Toda Playlist (ZIP)
+                        </button>
+                    </div>
+                </div>
 
-                <!-- Queue Section -->
-                <div class="queue-section">
-                    <div class="queue-header">
-                        <h3>Fila de Downloads</h3>
-                        <div class="queue-actions">
-                            <button id="refreshQueueBtn" class="btn btn-secondary btn-small">
-                                Atualizar
+                <!-- Progress Card -->
+                <div id="progressCard" class="card hidden">
+                    <div class="card-header">
+                        <h2 class="card-title">Download em Andamento</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="progress-info">
+                            <span id="progressTitle" class="progress-title">Baixando...</span>
+                            <span id="progressPercent" class="progress-percent">0%</span>
+                        </div>
+                        <div class="progress-bar-container">
+                            <div id="progressBar" class="progress-bar" style="width: 0%"></div>
+                        </div>
+                        <p id="progressStatus" class="progress-status text-muted"></p>
+                    </div>
+                </div>
+
+                <!-- Complete Card -->
+                <div id="completeCard" class="card hidden">
+                    <div class="card-header success">
+                        <h2 class="card-title">Download Completo!</h2>
+                    </div>
+                    <div class="card-body text-center">
+                        <div class="success-icon">✓</div>
+                        <p id="completeMessage" class="complete-message"></p>
+                        <div class="btn-group">
+                            <button id="saveFileBtn" class="btn btn-primary">Salvar Arquivo</button>
+                            <button id="newDownloadBtn" class="btn btn-outline">Novo Download</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Queue Section -->
+            <section id="queueSection" class="content-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Adicionar a Fila</h2>
+                    </div>
+                    <div class="card-body">
+                        <textarea id="batchUrls" class="form-textarea" rows="4" placeholder="Cole multiplas URLs (uma por linha)..."></textarea>
+                        <div class="input-row mt-2">
+                            <span id="urlCount" class="text-muted">0 URLs detectadas</span>
+                            <button id="addToQueueBtn" class="btn btn-primary">
+                                <span class="btn-text">Adicionar a Fila</span>
+                                <span class="btn-loader hidden"></span>
                             </button>
-                            <button id="clearQueueBtn" class="btn btn-secondary btn-small">
-                                Limpar Finalizados
+                        </div>
+                        <div id="batchError" class="alert alert-error hidden mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Queue Stats -->
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <span class="stat-value" id="statPending">0</span>
+                        <span class="stat-label">Na Fila</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statProcessing">0</span>
+                        <span class="stat-label">Processando</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statCompleted">0</span>
+                        <span class="stat-label">Completos</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statErrors">0</span>
+                        <span class="stat-label">Erros</span>
+                    </div>
+                </div>
+
+                <!-- Queue Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Fila de Downloads</h2>
+                        <div class="card-actions">
+                            <button id="refreshQueueBtn" class="btn btn-sm btn-outline">Atualizar</button>
+                            <button id="clearQueueBtn" class="btn btn-sm btn-outline">Limpar Finalizados</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th width="50">Status</th>
+                                        <th>Titulo</th>
+                                        <th width="80">Tipo</th>
+                                        <th width="150">Progresso</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="queueTableBody">
+                                    <tr><td colspan="4" class="text-center text-muted">Nenhum item na fila</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Library Section -->
+            <section id="librarySection" class="content-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Biblioteca de Arquivos</h2>
+                        <div class="card-actions">
+                            <button id="downloadSelectedBtn" class="btn btn-sm btn-primary" disabled>
+                                Baixar Selecionados (ZIP)
+                            </button>
+                            <button id="deleteSelectedBtn" class="btn btn-sm btn-danger" disabled>
+                                Deletar Selecionados
                             </button>
                         </div>
                     </div>
-
-                    <div id="queueStats" class="queue-stats">
-                        <span class="stat">
-                            <span class="stat-value" id="queuePending">0</span>
-                            <span class="stat-label">Na fila</span>
-                        </span>
-                        <span class="stat">
-                            <span class="stat-value" id="queueProcessing">0</span>
-                            <span class="stat-label">Processando</span>
-                        </span>
-                        <span class="stat">
-                            <span class="stat-value" id="queueCompleted">0</span>
-                            <span class="stat-label">Completos</span>
-                        </span>
-                        <span class="stat">
-                            <span class="stat-value" id="queueErrors">0</span>
-                            <span class="stat-label">Erros</span>
-                        </span>
-                    </div>
-
-                    <div id="queueList" class="queue-list">
-                        <p class="no-items">Nenhum item na fila</p>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th width="40"><input type="checkbox" id="selectAllFiles"></th>
+                                        <th>Nome do Arquivo</th>
+                                        <th width="100">Tamanho</th>
+                                        <th width="150">Acoes</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="libraryTableBody">
+                                    <tr><td colspan="4" class="text-center text-muted">Nenhum arquivo baixado</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
 
-            <section class="downloads-section">
-                <h2>Downloads Anteriores</h2>
-                <div id="downloadsList" class="downloads-list">
-                    <p class="no-downloads">Nenhum download ainda</p>
+            <!-- Settings Section -->
+            <section id="settingsSection" class="content-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Configuracoes de Cookies</h2>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">
+                            Os cookies sao necessarios quando o YouTube bloqueia downloads por protecao anti-bot.
+                            Seus cookies sao armazenados apenas no seu navegador (localStorage).
+                        </p>
+                        <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" class="btn btn-primary mb-3">
+                            Baixar Extensao de Cookies (Chrome)
+                        </a>
+                        <h4>Como obter seus cookies:</h4>
+                        <ol class="instructions-list">
+                            <li>Instale a extensao clicando no botao acima</li>
+                            <li>Acesse youtube.com e faca login na sua conta</li>
+                            <li>Clique na extensao e exporte os cookies</li>
+                            <li>Cole o conteudo no campo abaixo</li>
+                        </ol>
+                        <textarea id="settingsCookiesInput" class="form-textarea" rows="6" placeholder="Cole seus cookies aqui..."></textarea>
+                        <div class="panel-actions mt-2">
+                            <button class="btn btn-primary" id="settingsSaveCookiesBtn">Salvar Cookies</button>
+                            <button class="btn btn-outline" id="settingsClearCookiesBtn">Limpar Cookies</button>
+                            <span id="settingsCookiesStatus" class="status-text"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Sobre</h2>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>DownYouTube</strong> - Gerenciador de Downloads de Audio</p>
+                        <p class="text-muted">Ferramenta para download de videos e playlists do YouTube em formato MP3.</p>
+                        <p class="text-muted mt-2">Feito para uso pessoal. Respeite os direitos autorais.</p>
+                    </div>
                 </div>
             </section>
         </main>
-
-        <footer>
-            <p>Feito para uso pessoal. Respeite os direitos autorais.</p>
-        </footer>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>

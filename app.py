@@ -6,6 +6,8 @@ import re
 import threading
 import uuid
 import tempfile
+import zipfile
+import io
 from pathlib import Path
 from queue import Queue
 from datetime import datetime
@@ -512,6 +514,90 @@ def download_existing(filename):
     if not filepath.exists():
         return jsonify({'error': 'Arquivo não encontrado'}), 404
     return send_file(filepath, as_attachment=True)
+
+
+@app.route('/api/download-zip/<task_id>')
+def download_zip(task_id):
+    """Baixa todos os arquivos de uma playlist como ZIP"""
+    if task_id not in download_progress:
+        return jsonify({'error': 'Task não encontrada'}), 404
+
+    task = download_progress[task_id]
+
+    if task.get('status') != 'completed':
+        return jsonify({'error': 'Download ainda não completado'}), 400
+
+    if task.get('type') != 'playlist':
+        return jsonify({'error': 'Esta task não é uma playlist'}), 400
+
+    videos = task.get('videos', [])
+    if not videos:
+        return jsonify({'error': 'Nenhum arquivo encontrado'}), 404
+
+    # Criar ZIP em memória
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for video in videos:
+            if video.get('status') == 'completed':
+                filename = video.get('filename')
+                filepath = DOWNLOAD_FOLDER / filename
+                if filepath.exists():
+                    zip_file.write(filepath, filename)
+
+    zip_buffer.seek(0)
+
+    # Nome do ZIP baseado no título da playlist
+    playlist_title = task.get('title', 'playlist')
+    safe_title = sanitize_filename(playlist_title)
+    zip_filename = f"{safe_title}.zip"
+
+    return send_file(
+        zip_buffer,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=zip_filename
+    )
+
+
+@app.route('/api/download-multiple', methods=['POST'])
+def download_multiple():
+    """Baixa múltiplos arquivos selecionados como ZIP"""
+    data = request.json
+    filenames = data.get('filenames', [])
+
+    if not filenames:
+        return jsonify({'error': 'Nenhum arquivo selecionado'}), 400
+
+    # Criar ZIP em memória
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for filename in filenames:
+            filepath = DOWNLOAD_FOLDER / filename
+            if filepath.exists():
+                zip_file.write(filepath, filename)
+
+    zip_buffer.seek(0)
+
+    return send_file(
+        zip_buffer,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name='downloads.zip'
+    )
+
+
+@app.route('/api/delete-file/<filename>', methods=['DELETE'])
+def delete_file(filename):
+    """Deleta um arquivo"""
+    filepath = DOWNLOAD_FOLDER / filename
+    if not filepath.exists():
+        return jsonify({'error': 'Arquivo não encontrado'}), 404
+
+    try:
+        filepath.unlink()
+        return jsonify({'message': 'Arquivo deletado'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':

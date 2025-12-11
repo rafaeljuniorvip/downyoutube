@@ -1,6 +1,12 @@
+// ============================================
+// DownYouTube - ERP Style JavaScript
+// ============================================
+
 const API_BASE = '';
 
-// ============ Cookies Management ============
+// ============================================
+// Cookies Management
+// ============================================
 const COOKIES_STORAGE_KEY = 'yt_cookies';
 
 function getSavedCookies() {
@@ -17,138 +23,97 @@ function saveCookies(cookies) {
 }
 
 function updateCookiesIcon() {
-    const icon = document.getElementById('cookiesIcon');
+    const icons = document.querySelectorAll('#cookiesIcon');
     const hasCookies = !!getSavedCookies();
-    icon.textContent = hasCookies ? '🔒' : '🔓';
+    icons.forEach(icon => {
+        icon.textContent = hasCookies ? '🔒' : '🔓';
+    });
 }
 
-// Initialize cookies UI
-document.addEventListener('DOMContentLoaded', () => {
-    const toggleBtn = document.getElementById('toggleCookies');
-    const cookiesConfig = document.getElementById('cookiesConfig');
-    const cookiesInput = document.getElementById('cookiesInput');
-    const saveCookiesBtn = document.getElementById('saveCookiesBtn');
-    const clearCookiesBtn = document.getElementById('clearCookiesBtn');
-    const cookiesStatus = document.getElementById('cookiesStatus');
+// ============================================
+// Navigation
+// ============================================
+const sections = {
+    download: { title: 'Novo Download', subtitle: 'Baixe videos e playlists do YouTube em MP3' },
+    queue: { title: 'Fila de Downloads', subtitle: 'Gerencie seus downloads em lote' },
+    library: { title: 'Biblioteca', subtitle: 'Seus arquivos baixados' },
+    settings: { title: 'Configuracoes', subtitle: 'Ajustes do aplicativo' }
+};
 
-    // Load saved cookies
-    cookiesInput.value = getSavedCookies();
-    updateCookiesIcon();
-
-    // Toggle panel
-    toggleBtn.addEventListener('click', () => {
-        cookiesConfig.classList.toggle('hidden');
+function navigateTo(sectionName) {
+    // Update nav items
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.section === sectionName);
     });
 
-    // Save cookies
-    saveCookiesBtn.addEventListener('click', () => {
-        const cookies = cookiesInput.value.trim();
-        saveCookies(cookies);
-        cookiesStatus.textContent = cookies ? 'Cookies salvos!' : 'Cookies removidos';
-        cookiesStatus.className = 'cookies-status success';
-        setTimeout(() => {
-            cookiesStatus.textContent = '';
-        }, 3000);
+    // Update sections
+    document.querySelectorAll('.content-section').forEach(section => {
+        section.classList.remove('active');
     });
+    document.getElementById(`${sectionName}Section`).classList.add('active');
 
-    // Clear cookies
-    clearCookiesBtn.addEventListener('click', () => {
-        cookiesInput.value = '';
-        saveCookies('');
-        cookiesStatus.textContent = 'Cookies removidos';
-        cookiesStatus.className = 'cookies-status';
-        setTimeout(() => {
-            cookiesStatus.textContent = '';
-        }, 3000);
-    });
-});
+    // Update header
+    const section = sections[sectionName];
+    document.getElementById('pageTitle').textContent = section.title;
+    document.getElementById('pageSubtitle').textContent = section.subtitle;
 
-// Elementos do DOM - Single
-const urlInput = document.getElementById('urlInput');
-const fetchBtn = document.getElementById('fetchBtn');
-const errorMessage = document.getElementById('errorMessage');
-const videoInfo = document.getElementById('videoInfo');
-const playlistInfo = document.getElementById('playlistInfo');
-const progressSection = document.getElementById('progressSection');
-const downloadComplete = document.getElementById('downloadComplete');
-const downloadsList = document.getElementById('downloadsList');
+    // Load section data
+    if (sectionName === 'queue') loadQueue();
+    if (sectionName === 'library') loadLibrary();
+    if (sectionName === 'settings') loadSettingsCookies();
+}
 
-// Elementos do DOM - Batch
-const batchUrls = document.getElementById('batchUrls');
-const urlCount = document.getElementById('urlCount');
-const addToQueueBtn = document.getElementById('addToQueueBtn');
-const batchError = document.getElementById('batchError');
-const queueList = document.getElementById('queueList');
-const refreshQueueBtn = document.getElementById('refreshQueueBtn');
-const clearQueueBtn = document.getElementById('clearQueueBtn');
+// ============================================
+// Utility Functions
+// ============================================
+function formatDuration(seconds) {
+    if (!seconds) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
 
-// Estado atual
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function showError(elementId, message) {
+    const el = document.getElementById(elementId);
+    el.textContent = message;
+    el.classList.remove('hidden');
+}
+
+function hideError(elementId) {
+    document.getElementById(elementId).classList.add('hidden');
+}
+
+function setLoading(btn, loading) {
+    const textEl = btn.querySelector('.btn-text');
+    const loaderEl = btn.querySelector('.btn-loader');
+    if (textEl) textEl.classList.toggle('hidden', loading);
+    if (loaderEl) loaderEl.classList.toggle('hidden', !loading);
+    btn.disabled = loading;
+}
+
+// ============================================
+// Download Section
+// ============================================
 let currentTaskId = null;
-let currentType = null;
+let currentDownloadType = null;
+let currentUrl = null;
 let progressInterval = null;
-let queueInterval = null;
 
-// Event Listeners - Tabs
-document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        const tabName = tab.dataset.tab;
+async function fetchVideoInfo() {
+    const url = document.getElementById('urlInput').value.trim();
+    if (!url) return;
 
-        // Update tab buttons
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        // Update tab contents
-        document.querySelectorAll('.tab-content').forEach(content => {
-            content.classList.remove('active');
-        });
-        document.getElementById(`${tabName}Tab`).classList.add('active');
-
-        // Start/stop queue polling based on tab
-        if (tabName === 'batch') {
-            startQueuePolling();
-        } else {
-            stopQueuePolling();
-        }
-    });
-});
-
-// Event Listeners - Single Download
-fetchBtn.addEventListener('click', fetchInfo);
-urlInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') fetchInfo();
-});
-
-document.getElementById('downloadBtn').addEventListener('click', () => startDownload('video'));
-document.getElementById('downloadPlaylistBtn').addEventListener('click', () => startDownload('playlist'));
-document.getElementById('saveFileBtn').addEventListener('click', saveFile);
-document.getElementById('newDownloadBtn').addEventListener('click', resetUI);
-
-// Event Listeners - Batch
-batchUrls.addEventListener('input', updateUrlCount);
-addToQueueBtn.addEventListener('click', addToQueue);
-refreshQueueBtn.addEventListener('click', loadQueue);
-clearQueueBtn.addEventListener('click', clearFinished);
-
-// Carrega downloads anteriores ao iniciar
-loadPreviousDownloads();
-
-// ============ Single Download Functions ============
-
-async function fetchInfo() {
-    const url = urlInput.value.trim();
-
-    if (!url) {
-        showError('Por favor, insira uma URL do YouTube');
-        return;
-    }
-
-    if (!isValidYouTubeUrl(url)) {
-        showError('URL invalida. Use uma URL do YouTube valida.');
-        return;
-    }
-
-    hideAllSections();
-    setLoading(true);
+    currentUrl = url;
+    const fetchBtn = document.getElementById('fetchBtn');
+    setLoading(fetchBtn, true);
+    hideError('errorMessage');
+    hideAllCards();
 
     try {
         const response = await fetch(`${API_BASE}/api/info`, {
@@ -168,68 +133,61 @@ async function fetchInfo() {
         } else {
             showVideoInfo(data);
         }
-
     } catch (error) {
-        showError(error.message);
+        showError('errorMessage', error.message);
     } finally {
-        setLoading(false);
+        setLoading(fetchBtn, false);
     }
 }
 
-function isValidYouTubeUrl(url) {
-    const patterns = [
-        /^(https?:\/\/)?(www\.)?youtube\.com\/watch\?v=[\w-]+/,
-        /^(https?:\/\/)?(www\.)?youtube\.com\/playlist\?list=[\w-]+/,
-        /^(https?:\/\/)?youtu\.be\/[\w-]+/,
-        /^(https?:\/\/)?(www\.)?youtube\.com\/shorts\/[\w-]+/
-    ];
-    return patterns.some(pattern => pattern.test(url));
+function hideAllCards() {
+    ['videoInfoCard', 'playlistInfoCard', 'progressCard', 'completeCard'].forEach(id => {
+        document.getElementById(id).classList.add('hidden');
+    });
 }
 
 function showVideoInfo(data) {
-    document.getElementById('thumbnail').src = data.thumbnail || 'https://via.placeholder.com/200x112?text=No+Thumbnail';
+    document.getElementById('thumbnail').src = data.thumbnail || '';
     document.getElementById('videoTitle').textContent = data.title;
-    document.getElementById('videoChannel').textContent = data.channel;
-    document.getElementById('videoDuration').textContent = formatDuration(data.duration);
-
-    videoInfo.classList.remove('hidden');
-    currentType = 'video';
+    document.getElementById('videoChannel').textContent = data.channel || '';
+    document.getElementById('videoDuration').textContent = `Duracao: ${formatDuration(data.duration)}`;
+    document.getElementById('videoInfoCard').classList.remove('hidden');
+    currentDownloadType = 'video';
 }
 
 function showPlaylistInfo(data) {
     document.getElementById('playlistTitle').textContent = data.title;
     document.getElementById('playlistCount').textContent = `${data.count} videos`;
 
-    const videosContainer = document.getElementById('playlistVideos');
-    videosContainer.innerHTML = data.videos.map((video, index) => `
-        <div class="playlist-item">
-            <span class="playlist-item-number">${index + 1}</span>
-            <span class="playlist-item-title">${escapeHtml(video.title)}</span>
-            <span class="playlist-item-duration">${formatDuration(video.duration)}</span>
-        </div>
+    const tbody = document.getElementById('playlistVideos');
+    tbody.innerHTML = data.videos.map((video, i) => `
+        <tr>
+            <td>${i + 1}</td>
+            <td>${video.title}</td>
+            <td>${formatDuration(video.duration)}</td>
+        </tr>
     `).join('');
 
-    playlistInfo.classList.remove('hidden');
-    currentType = 'playlist';
+    document.getElementById('playlistInfoCard').classList.remove('hidden');
+    currentDownloadType = 'playlist';
 }
 
-async function startDownload(type) {
-    const url = urlInput.value.trim();
-
-    hideAllSections();
-    progressSection.classList.remove('hidden');
-
-    document.getElementById('progressTitle').textContent =
-        type === 'playlist' ? 'Baixando playlist...' : 'Baixando...';
-    document.getElementById('progressFill').style.width = '0%';
-    document.getElementById('progressText').textContent = '0%';
-    document.getElementById('progressStatus').textContent = 'Iniciando...';
+async function startDownload() {
+    hideAllCards();
+    document.getElementById('progressCard').classList.remove('hidden');
+    document.getElementById('progressBar').style.width = '0%';
+    document.getElementById('progressPercent').textContent = '0%';
+    document.getElementById('progressStatus').textContent = 'Iniciando download...';
 
     try {
         const response = await fetch(`${API_BASE}/api/download`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, type, cookies: getSavedCookies() })
+            body: JSON.stringify({
+                url: currentUrl,
+                type: currentDownloadType,
+                cookies: getSavedCookies()
+            })
         });
 
         const data = await response.json();
@@ -239,136 +197,104 @@ async function startDownload(type) {
         }
 
         currentTaskId = data.task_id;
-        currentType = type;
         startProgressPolling();
-
     } catch (error) {
-        showError(error.message);
-        progressSection.classList.add('hidden');
+        showError('errorMessage', error.message);
+        hideAllCards();
     }
 }
 
 function startProgressPolling() {
+    if (progressInterval) clearInterval(progressInterval);
+
     progressInterval = setInterval(async () => {
         try {
             const response = await fetch(`${API_BASE}/api/progress/${currentTaskId}`);
             const data = await response.json();
 
+            if (!response.ok) {
+                throw new Error(data.error || 'Erro ao obter progresso');
+            }
+
             updateProgress(data);
 
             if (data.status === 'completed') {
                 clearInterval(progressInterval);
-                showDownloadComplete(data);
+                showComplete(data);
             } else if (data.status === 'error') {
                 clearInterval(progressInterval);
-                showError(data.error || 'Erro durante o download');
-                progressSection.classList.add('hidden');
+                showError('errorMessage', data.error || 'Erro no download');
+                hideAllCards();
             }
-
         } catch (error) {
-            console.error('Erro ao verificar progresso:', error);
+            console.error('Progress error:', error);
         }
-    }, 500);
+    }, 1000);
 }
 
 function updateProgress(data) {
     const progress = Math.round(data.progress || 0);
-    document.getElementById('progressFill').style.width = `${progress}%`;
-    document.getElementById('progressText').textContent = `${progress}%`;
+    document.getElementById('progressBar').style.width = `${progress}%`;
+    document.getElementById('progressPercent').textContent = `${progress}%`;
 
-    let statusText = '';
-
-    if (data.type === 'playlist' && data.current_video) {
-        statusText = `Baixando: ${data.current_video} (${data.current_index}/${data.total})`;
-    } else if (data.status === 'downloading') {
-        statusText = 'Baixando audio...';
-    } else if (data.status === 'converting') {
-        statusText = 'Convertendo para MP3...';
-    } else if (data.status === 'starting') {
-        statusText = 'Iniciando...';
+    let status = 'Baixando...';
+    if (data.status === 'converting') {
+        status = 'Convertendo para MP3...';
+    } else if (data.current_video) {
+        status = `Baixando: ${data.current_video} (${data.current_index}/${data.total})`;
     }
-
-    document.getElementById('progressStatus').textContent = statusText;
+    document.getElementById('progressStatus').textContent = status;
 }
 
-function showDownloadComplete(data) {
-    progressSection.classList.add('hidden');
-    downloadComplete.classList.remove('hidden');
+function showComplete(data) {
+    document.getElementById('progressCard').classList.add('hidden');
+    document.getElementById('completeCard').classList.remove('hidden');
 
-    if (data.type === 'playlist') {
-        const completed = data.videos?.filter(v => v.status === 'completed').length || 0;
-        document.getElementById('completedFilename').textContent =
-            `${completed} arquivos baixados com sucesso!`;
+    if (currentDownloadType === 'playlist') {
+        const completed = data.videos ? data.videos.filter(v => v.status === 'completed').length : 0;
+        document.getElementById('completeMessage').textContent = `${completed} arquivos baixados com sucesso!`;
+        document.getElementById('saveFileBtn').textContent = 'Baixar ZIP';
     } else {
-        document.getElementById('completedFilename').textContent = data.filename || 'Arquivo baixado';
+        document.getElementById('completeMessage').textContent = data.filename || 'Arquivo baixado com sucesso!';
+        document.getElementById('saveFileBtn').textContent = 'Salvar Arquivo';
     }
-
-    loadPreviousDownloads();
 }
 
-async function saveFile() {
-    if (!currentTaskId || currentType === 'playlist') {
-        loadPreviousDownloads();
-        return;
+function downloadFile() {
+    if (currentDownloadType === 'playlist') {
+        window.location.href = `${API_BASE}/api/download-zip/${currentTaskId}`;
+    } else {
+        window.location.href = `${API_BASE}/api/download-file/${currentTaskId}`;
     }
-
-    window.location.href = `${API_BASE}/api/download-file/${currentTaskId}`;
 }
 
-function resetUI() {
-    urlInput.value = '';
-    hideAllSections();
+function resetDownload() {
+    hideAllCards();
+    document.getElementById('urlInput').value = '';
     currentTaskId = null;
-    currentType = null;
-    if (progressInterval) {
-        clearInterval(progressInterval);
-    }
+    currentDownloadType = null;
+    currentUrl = null;
 }
 
-function hideAllSections() {
-    errorMessage.classList.add('hidden');
-    videoInfo.classList.add('hidden');
-    playlistInfo.classList.add('hidden');
-    progressSection.classList.add('hidden');
-    downloadComplete.classList.add('hidden');
-}
+// ============================================
+// Queue Section
+// ============================================
+let queueInterval = null;
 
-function showError(message) {
-    errorMessage.textContent = message;
-    errorMessage.classList.remove('hidden');
-}
-
-function setLoading(loading) {
-    fetchBtn.disabled = loading;
-    document.querySelector('#fetchBtn .btn-text').classList.toggle('hidden', loading);
-    document.querySelector('#fetchBtn .btn-loader').classList.toggle('hidden', !loading);
-}
-
-// ============ Batch Functions ============
-
-function updateUrlCount() {
-    const urls = parseUrls(batchUrls.value);
-    urlCount.textContent = `${urls.length} URL${urls.length !== 1 ? 's' : ''} detectada${urls.length !== 1 ? 's' : ''}`;
-}
-
-function parseUrls(text) {
-    return text
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line && isValidYouTubeUrl(line));
+function countUrls(text) {
+    const urls = text.split('\n').filter(line => line.trim().length > 0);
+    return urls.length;
 }
 
 async function addToQueue() {
-    const urls = parseUrls(batchUrls.value);
+    const textarea = document.getElementById('batchUrls');
+    const urls = textarea.value.split('\n').filter(line => line.trim().length > 0);
 
-    if (urls.length === 0) {
-        batchError.textContent = 'Nenhuma URL valida encontrada';
-        batchError.classList.remove('hidden');
-        return;
-    }
+    if (urls.length === 0) return;
 
-    batchError.classList.add('hidden');
-    setBatchLoading(true);
+    const btn = document.getElementById('addToQueueBtn');
+    setLoading(btn, true);
+    hideError('batchError');
 
     try {
         const response = await fetch(`${API_BASE}/api/batch`, {
@@ -383,23 +309,14 @@ async function addToQueue() {
             throw new Error(data.error || 'Erro ao adicionar a fila');
         }
 
-        batchUrls.value = '';
-        updateUrlCount();
+        textarea.value = '';
+        document.getElementById('urlCount').textContent = '0 URLs detectadas';
         loadQueue();
-        startQueuePolling();
-
     } catch (error) {
-        batchError.textContent = error.message;
-        batchError.classList.remove('hidden');
+        showError('batchError', error.message);
     } finally {
-        setBatchLoading(false);
+        setLoading(btn, false);
     }
-}
-
-function setBatchLoading(loading) {
-    addToQueueBtn.disabled = loading;
-    document.querySelector('#addToQueueBtn .btn-text').classList.toggle('hidden', loading);
-    document.querySelector('#addToQueueBtn .btn-loader').classList.toggle('hidden', !loading);
 }
 
 async function loadQueue() {
@@ -408,173 +325,299 @@ async function loadQueue() {
         const data = await response.json();
 
         updateQueueStats(data.items);
-        renderQueueList(data.items);
-        loadPreviousDownloads();
+        updateQueueTable(data.items);
+        updateQueueBadge(data.items);
 
+        // Start polling if there are active items
+        const hasActive = data.items.some(item => ['queued', 'processing'].includes(item.status));
+        if (hasActive && !queueInterval) {
+            queueInterval = setInterval(loadQueue, 2000);
+        } else if (!hasActive && queueInterval) {
+            clearInterval(queueInterval);
+            queueInterval = null;
+        }
     } catch (error) {
-        console.error('Erro ao carregar fila:', error);
+        console.error('Queue error:', error);
     }
 }
 
 function updateQueueStats(items) {
     const stats = {
-        queued: 0,
-        processing: 0,
-        completed: 0,
-        error: 0
+        pending: items.filter(i => i.status === 'queued').length,
+        processing: items.filter(i => i.status === 'processing').length,
+        completed: items.filter(i => i.status === 'completed').length,
+        errors: items.filter(i => i.status === 'error').length
     };
 
-    items.forEach(item => {
-        if (stats.hasOwnProperty(item.status)) {
-            stats[item.status]++;
-        }
-    });
-
-    document.getElementById('queuePending').textContent = stats.queued;
-    document.getElementById('queueProcessing').textContent = stats.processing;
-    document.getElementById('queueCompleted').textContent = stats.completed;
-    document.getElementById('queueErrors').textContent = stats.error;
+    document.getElementById('statPending').textContent = stats.pending;
+    document.getElementById('statProcessing').textContent = stats.processing;
+    document.getElementById('statCompleted').textContent = stats.completed;
+    document.getElementById('statErrors').textContent = stats.errors;
 }
 
-function renderQueueList(items) {
+function updateQueueTable(items) {
+    const tbody = document.getElementById('queueTableBody');
+
     if (items.length === 0) {
-        queueList.innerHTML = '<p class="no-items">Nenhum item na fila</p>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum item na fila</td></tr>';
         return;
     }
 
-    queueList.innerHTML = items.map(item => {
-        const progress = Math.round(item.progress || 0);
-        const statusClass = item.status;
-
-        let progressHtml = '';
-        if (item.status === 'processing') {
-            let progressText = `${progress}%`;
-            if (item.type === 'playlist' && item.current_index && item.total) {
-                progressText = `${item.current_index}/${item.total}`;
-            }
-            progressHtml = `
-                <div class="queue-item-progress">
-                    <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${progress}%"></div>
-                    </div>
-                    <div class="queue-item-progress-text">${progressText}</div>
-                </div>
-            `;
-        }
-
-        let errorHtml = '';
-        if (item.status === 'error' && item.error) {
-            errorHtml = `<div class="queue-item-error">${escapeHtml(item.error)}</div>`;
-        }
+    tbody.innerHTML = items.map(item => {
+        const progressHtml = item.status === 'processing' ?
+            `<div class="progress-bar-container" style="height: 4px;">
+                <div class="progress-bar" style="width: ${Math.round(item.progress || 0)}%"></div>
+            </div>
+            <small>${Math.round(item.progress || 0)}%</small>` :
+            `<small>${item.status}</small>`;
 
         return `
-            <div class="queue-item">
-                <div class="queue-item-status ${statusClass}"></div>
-                <div class="queue-item-info">
-                    <div class="queue-item-title">${escapeHtml(item.title)}</div>
-                    <div class="queue-item-meta">
-                        <span class="queue-item-type">${item.type}</span>
-                        <span>${getStatusText(item.status)}</span>
-                    </div>
-                    ${errorHtml}
-                </div>
-                ${progressHtml}
-            </div>
+            <tr>
+                <td><span class="status-dot ${item.status}"></span></td>
+                <td>${item.title}</td>
+                <td><span class="badge badge-${item.type === 'playlist' ? 'info' : 'success'}">${item.type}</span></td>
+                <td>${progressHtml}</td>
+            </tr>
         `;
     }).join('');
 }
 
-function getStatusText(status) {
-    const texts = {
-        'queued': 'Na fila',
-        'processing': 'Processando',
-        'completed': 'Completo',
-        'error': 'Erro',
-        'cancelled': 'Cancelado'
-    };
-    return texts[status] || status;
+function updateQueueBadge(items) {
+    const active = items.filter(i => ['queued', 'processing'].includes(i.status)).length;
+    const badge = document.getElementById('queueBadge');
+    badge.textContent = active;
+    badge.style.display = active > 0 ? 'block' : 'none';
 }
 
-async function clearFinished() {
+async function clearQueue() {
     try {
         await fetch(`${API_BASE}/api/queue/clear`, { method: 'POST' });
         loadQueue();
     } catch (error) {
-        console.error('Erro ao limpar fila:', error);
+        console.error('Clear queue error:', error);
     }
 }
 
-function startQueuePolling() {
-    if (queueInterval) return;
+// ============================================
+// Library Section
+// ============================================
+let selectedFiles = new Set();
 
-    loadQueue();
-    queueInterval = setInterval(loadQueue, 2000);
-}
-
-function stopQueuePolling() {
-    if (queueInterval) {
-        clearInterval(queueInterval);
-        queueInterval = null;
-    }
-}
-
-// ============ Utility Functions ============
-
-function formatDuration(seconds) {
-    if (!seconds) return '--:--';
-
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-        return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
-
-function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-}
-
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-async function loadPreviousDownloads() {
+async function loadLibrary() {
     try {
         const response = await fetch(`${API_BASE}/api/list-downloads`);
         const files = await response.json();
 
-        if (files.length === 0) {
-            downloadsList.innerHTML = '<p class="no-downloads">Nenhum download ainda</p>';
-            return;
-        }
-
-        // Ordena por data de modificacao (mais recente primeiro)
-        files.sort((a, b) => b.modified - a.modified);
-
-        downloadsList.innerHTML = files.map(file => `
-            <div class="download-item">
-                <div class="download-item-info">
-                    <div class="download-item-name">${escapeHtml(file.name)}</div>
-                    <div class="download-item-size">${formatFileSize(file.size)}</div>
-                </div>
-                <button class="btn btn-primary" onclick="downloadExisting('${escapeHtml(file.name)}')">
-                    Baixar
-                </button>
-            </div>
-        `).join('');
-
+        document.getElementById('totalFiles').textContent = files.length;
+        updateLibraryTable(files);
     } catch (error) {
-        console.error('Erro ao carregar downloads:', error);
+        console.error('Library error:', error);
     }
+}
+
+function updateLibraryTable(files) {
+    const tbody = document.getElementById('libraryTableBody');
+
+    if (files.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum arquivo baixado</td></tr>';
+        return;
+    }
+
+    // Sort by modified date (newest first)
+    files.sort((a, b) => b.modified - a.modified);
+
+    tbody.innerHTML = files.map(file => `
+        <tr>
+            <td><input type="checkbox" class="file-checkbox" data-filename="${file.name}"></td>
+            <td>${file.name}</td>
+            <td>${formatFileSize(file.size)}</td>
+            <td class="table-actions">
+                <button class="btn btn-sm btn-primary" onclick="downloadExisting('${file.name}')">Baixar</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.name}')">Deletar</button>
+            </td>
+        </tr>
+    `).join('');
+
+    // Add checkbox listeners
+    document.querySelectorAll('.file-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedFiles);
+    });
+}
+
+function updateSelectedFiles() {
+    selectedFiles.clear();
+    document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
+        selectedFiles.add(cb.dataset.filename);
+    });
+
+    const hasSelected = selectedFiles.size > 0;
+    document.getElementById('downloadSelectedBtn').disabled = !hasSelected;
+    document.getElementById('deleteSelectedBtn').disabled = !hasSelected;
 }
 
 function downloadExisting(filename) {
     window.location.href = `${API_BASE}/api/download-existing/${encodeURIComponent(filename)}`;
 }
+
+async function deleteFile(filename) {
+    if (!confirm(`Deletar "${filename}"?`)) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/delete-file/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            loadLibrary();
+        }
+    } catch (error) {
+        console.error('Delete error:', error);
+    }
+}
+
+async function downloadSelectedFiles() {
+    if (selectedFiles.size === 0) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/download-multiple`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filenames: Array.from(selectedFiles) })
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'downloads.zip';
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        console.error('Download multiple error:', error);
+    }
+}
+
+async function deleteSelectedFiles() {
+    if (selectedFiles.size === 0) return;
+    if (!confirm(`Deletar ${selectedFiles.size} arquivos?`)) return;
+
+    for (const filename of selectedFiles) {
+        try {
+            await fetch(`${API_BASE}/api/delete-file/${encodeURIComponent(filename)}`, {
+                method: 'DELETE'
+            });
+        } catch (error) {
+            console.error('Delete error:', error);
+        }
+    }
+
+    selectedFiles.clear();
+    loadLibrary();
+}
+
+// ============================================
+// Settings Section
+// ============================================
+function loadSettingsCookies() {
+    document.getElementById('settingsCookiesInput').value = getSavedCookies();
+}
+
+function saveSettingsCookies() {
+    const cookies = document.getElementById('settingsCookiesInput').value.trim();
+    saveCookies(cookies);
+    showStatus('settingsCookiesStatus', cookies ? 'Cookies salvos!' : 'Cookies removidos');
+}
+
+function clearSettingsCookies() {
+    document.getElementById('settingsCookiesInput').value = '';
+    saveCookies('');
+    showStatus('settingsCookiesStatus', 'Cookies removidos');
+}
+
+function showStatus(elementId, message) {
+    const el = document.getElementById(elementId);
+    el.textContent = message;
+    setTimeout(() => { el.textContent = ''; }, 3000);
+}
+
+// ============================================
+// Cookies Panel
+// ============================================
+function toggleCookiesPanel() {
+    const panel = document.getElementById('cookiesPanel');
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) {
+        document.getElementById('cookiesInput').value = getSavedCookies();
+    }
+}
+
+function savePanelCookies() {
+    const cookies = document.getElementById('cookiesInput').value.trim();
+    saveCookies(cookies);
+    showStatus('cookiesStatus', cookies ? 'Salvos!' : 'Removidos');
+}
+
+function clearPanelCookies() {
+    document.getElementById('cookiesInput').value = '';
+    saveCookies('');
+    showStatus('cookiesStatus', 'Removidos');
+}
+
+// ============================================
+// Event Listeners
+// ============================================
+document.addEventListener('DOMContentLoaded', () => {
+    // Navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateTo(item.dataset.section);
+        });
+    });
+
+    // Download section
+    document.getElementById('fetchBtn').addEventListener('click', fetchVideoInfo);
+    document.getElementById('urlInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') fetchVideoInfo();
+    });
+    document.getElementById('downloadBtn').addEventListener('click', startDownload);
+    document.getElementById('downloadPlaylistBtn').addEventListener('click', startDownload);
+    document.getElementById('saveFileBtn').addEventListener('click', downloadFile);
+    document.getElementById('newDownloadBtn').addEventListener('click', resetDownload);
+
+    // Queue section
+    document.getElementById('batchUrls').addEventListener('input', (e) => {
+        const count = countUrls(e.target.value);
+        document.getElementById('urlCount').textContent = `${count} URLs detectadas`;
+    });
+    document.getElementById('addToQueueBtn').addEventListener('click', addToQueue);
+    document.getElementById('refreshQueueBtn').addEventListener('click', loadQueue);
+    document.getElementById('clearQueueBtn').addEventListener('click', clearQueue);
+
+    // Library section
+    document.getElementById('selectAllFiles').addEventListener('change', (e) => {
+        document.querySelectorAll('.file-checkbox').forEach(cb => {
+            cb.checked = e.target.checked;
+        });
+        updateSelectedFiles();
+    });
+    document.getElementById('downloadSelectedBtn').addEventListener('click', downloadSelectedFiles);
+    document.getElementById('deleteSelectedBtn').addEventListener('click', deleteSelectedFiles);
+
+    // Settings section
+    document.getElementById('settingsSaveCookiesBtn').addEventListener('click', saveSettingsCookies);
+    document.getElementById('settingsClearCookiesBtn').addEventListener('click', clearSettingsCookies);
+
+    // Cookies panel
+    document.getElementById('toggleCookiesBtn').addEventListener('click', toggleCookiesPanel);
+    document.getElementById('closeCookiesPanel').addEventListener('click', toggleCookiesPanel);
+    document.getElementById('saveCookiesBtn').addEventListener('click', savePanelCookies);
+    document.getElementById('clearCookiesBtn').addEventListener('click', clearPanelCookies);
+
+    // Initialize
+    updateCookiesIcon();
+    loadLibrary();
+    loadQueue();
+});
