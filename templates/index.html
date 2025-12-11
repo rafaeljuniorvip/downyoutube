@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube MP3 Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>YouTube MP3 Downloader</h1>
+            <p class="subtitle">Baixe videos e playlists do YouTube em MP3</p>
+        </header>
+
+        <main>
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-tab="single">Download Simples</button>
+                <button class="tab" data-tab="batch">Batch (Multiplas URLs)</button>
+            </div>
+
+            <!-- Single Download Section -->
+            <section id="singleTab" class="download-section tab-content active">
+                <div class="input-group">
+                    <input
+                        type="text"
+                        id="urlInput"
+                        placeholder="Cole a URL do video ou playlist do YouTube..."
+                        autocomplete="off"
+                    >
+                    <button id="fetchBtn" class="btn btn-primary">
+                        <span class="btn-text">Buscar</span>
+                        <span class="btn-loader hidden"></span>
+                    </button>
+                </div>
+
+                <div id="errorMessage" class="error-message hidden"></div>
+
+                <div id="videoInfo" class="video-info hidden">
+                    <div class="video-card">
+                        <img id="thumbnail" src="" alt="Thumbnail" class="thumbnail">
+                        <div class="video-details">
+                            <h3 id="videoTitle"></h3>
+                            <p id="videoChannel" class="channel"></p>
+                            <p id="videoDuration" class="duration"></p>
+                        </div>
+                    </div>
+                    <button id="downloadBtn" class="btn btn-success btn-large">
+                        Baixar MP3
+                    </button>
+                </div>
+
+                <div id="playlistInfo" class="playlist-info hidden">
+                    <div class="playlist-header">
+                        <h3 id="playlistTitle"></h3>
+                        <p id="playlistCount" class="count"></p>
+                    </div>
+                    <div id="playlistVideos" class="playlist-videos"></div>
+                    <button id="downloadPlaylistBtn" class="btn btn-success btn-large">
+                        Baixar Toda Playlist
+                    </button>
+                </div>
+
+                <div id="progressSection" class="progress-section hidden">
+                    <h3 id="progressTitle">Baixando...</h3>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <p id="progressText" class="progress-text">0%</p>
+                    <p id="progressStatus" class="progress-status"></p>
+                </div>
+
+                <div id="downloadComplete" class="download-complete hidden">
+                    <div class="success-icon">✓</div>
+                    <h3>Download Completo!</h3>
+                    <p id="completedFilename"></p>
+                    <button id="saveFileBtn" class="btn btn-primary">
+                        Salvar Arquivo
+                    </button>
+                    <button id="newDownloadBtn" class="btn btn-secondary">
+                        Novo Download
+                    </button>
+                </div>
+            </section>
+
+            <!-- Batch Download Section -->
+            <section id="batchTab" class="download-section tab-content">
+                <div class="batch-input-section">
+                    <label for="batchUrls">Cole suas URLs (uma por linha):</label>
+                    <textarea
+                        id="batchUrls"
+                        placeholder="https://www.youtube.com/watch?v=...
+https://www.youtube.com/playlist?list=...
+https://youtu.be/..."
+                        rows="6"
+                    ></textarea>
+                    <div class="batch-actions">
+                        <span id="urlCount" class="url-count">0 URLs detectadas</span>
+                        <button id="addToQueueBtn" class="btn btn-success">
+                            <span class="btn-text">Adicionar a Fila</span>
+                            <span class="btn-loader hidden"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="batchError" class="error-message hidden"></div>
+
+                <!-- Queue Section -->
+                <div class="queue-section">
+                    <div class="queue-header">
+                        <h3>Fila de Downloads</h3>
+                        <div class="queue-actions">
+                            <button id="refreshQueueBtn" class="btn btn-secondary btn-small">
+                                Atualizar
+                            </button>
+                            <button id="clearQueueBtn" class="btn btn-secondary btn-small">
+                                Limpar Finalizados
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="queueStats" class="queue-stats">
+                        <span class="stat">
+                            <span class="stat-value" id="queuePending">0</span>
+                            <span class="stat-label">Na fila</span>
+                        </span>
+                        <span class="stat">
+                            <span class="stat-value" id="queueProcessing">0</span>
+                            <span class="stat-label">Processando</span>
+                        </span>
+                        <span class="stat">
+                            <span class="stat-value" id="queueCompleted">0</span>
+                            <span class="stat-label">Completos</span>
+                        </span>
+                        <span class="stat">
+                            <span class="stat-value" id="queueErrors">0</span>
+                            <span class="stat-label">Erros</span>
+                        </span>
+                    </div>
+
+                    <div id="queueList" class="queue-list">
+                        <p class="no-items">Nenhum item na fila</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="downloads-section">
+                <h2>Downloads Anteriores</h2>
+                <div id="downloadsList" class="downloads-list">
+                    <p class="no-downloads">Nenhum download ainda</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Feito para uso pessoal. Respeite os direitos autorais.</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

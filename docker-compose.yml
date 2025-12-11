@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  downyoutube:
+    image: ghcr.io/${GITHUB_USER:-seu-usuario}/downyoutube:latest
+    networks:
+      - traefik-public
+    volumes:
+      - downloads:/app/downloads
+    deploy:
+      mode: replicated
+      replicas: 1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.downyoutube.rule=Host(`downyoutube.papelaria.vip`)"
+        - "traefik.http.routers.downyoutube.entrypoints=websecure"
+        - "traefik.http.routers.downyoutube.tls=true"
+        - "traefik.http.routers.downyoutube.tls.certresolver=letsencrypt"
+        - "traefik.http.services.downyoutube.loadbalancer.server.port=5000"
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+volumes:
+  downloads:
+
+networks:
+  traefik-public:
+    external: true
