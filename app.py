@@ -5,6 +5,7 @@ import os
 import re
 import threading
 import uuid
+import tempfile
 from pathlib import Path
 from queue import Queue
 from datetime import datetime
@@ -15,13 +16,35 @@ CORS(app)
 DOWNLOAD_FOLDER = Path("downloads")
 DOWNLOAD_FOLDER.mkdir(exist_ok=True)
 
-COOKIES_FILE = Path("cookies.txt")
+# Armazena cookies por sessão/task
+task_cookies = {}
 
 
-def get_cookies_opts():
-    """Retorna opções de cookies se o arquivo existir"""
-    if COOKIES_FILE.exists():
-        return {'cookiefile': str(COOKIES_FILE)}
+def create_temp_cookies_file(cookies_content):
+    """Cria um arquivo temporário com os cookies"""
+    if not cookies_content:
+        return None
+    fd, path = tempfile.mkstemp(suffix='.txt', prefix='cookies_')
+    with os.fdopen(fd, 'w') as f:
+        f.write(cookies_content)
+    return path
+
+
+def cleanup_cookies_file(path):
+    """Remove o arquivo temporário de cookies"""
+    if path and os.path.exists(path):
+        try:
+            os.remove(path)
+        except:
+            pass
+
+
+def get_cookies_opts(cookies_content=None):
+    """Retorna opções de cookies"""
+    if cookies_content:
+        cookies_file = create_temp_cookies_file(cookies_content)
+        if cookies_file:
+            return {'cookiefile': cookies_file}
     return {}
 
 # Armazena o progresso dos downloads
@@ -55,22 +78,32 @@ def progress_hook(d, task_id):
         download_progress[task_id]['status'] = 'converting'
 
 
-def get_video_info(url):
+def get_video_info(url, cookies=None):
     """Obtém informações do vídeo ou playlist"""
+    cookies_opts = get_cookies_opts(cookies)
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'extract_flat': 'in_playlist',
-        **get_cookies_opts(),
+        **cookies_opts,
     }
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-        return info
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return info
+    finally:
+        cleanup_cookies_file(cookies_opts.get('cookiefile'))
 
 
-def download_single_video(url, task_id, output_path=None):
+def download_single_video(url, task_id, output_path=None, cookies=None):
     """Baixa um único vídeo como MP3"""
+    # Busca cookies da tarefa se não fornecidos
+    if cookies is None:
+        cookies = task_cookies.get(task_id) or task_cookies.get(task_id.split('_video_')[0])
+
+    cookies_opts = get_cookies_opts(cookies)
+
     try:
         if output_path is None:
             output_path = str(DOWNLOAD_FOLDER)
@@ -86,7 +119,7 @@ def download_single_video(url, task_id, output_path=None):
             'progress_hooks': [lambda d: progress_hook(d, task_id)],
             'quiet': True,
             'no_warnings': True,
-            **get_cookies_opts(),
+            **cookies_opts,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -105,13 +138,17 @@ def download_single_video(url, task_id, output_path=None):
         download_progress[task_id]['status'] = 'error'
         download_progress[task_id]['error'] = str(e)
         return None
+    finally:
+        cleanup_cookies_file(cookies_opts.get('cookiefile'))
 
 
 def download_playlist(url, task_id):
     """Baixa todos os vídeos de uma playlist como MP3"""
+    cookies = task_cookies.get(task_id)
+
     try:
         # Primeiro, obtém a lista de vídeos
-        info = get_video_info(url)
+        info = get_video_info(url, cookies)
 
         if 'entries' not in info:
             download_progress[task_id]['status'] = 'error'
@@ -234,12 +271,13 @@ def get_info():
     """Obtém informações do vídeo ou playlist"""
     data = request.json
     url = data.get('url', '')
+    cookies = data.get('cookies', '')
 
     if not url:
         return jsonify({'error': 'URL não fornecida'}), 400
 
     try:
-        info = get_video_info(url)
+        info = get_video_info(url, cookies)
 
         is_playlist = 'entries' in info
 
@@ -276,11 +314,17 @@ def start_download():
     data = request.json
     url = data.get('url', '')
     download_type = data.get('type', 'video')
+    cookies = data.get('cookies', '')
 
     if not url:
         return jsonify({'error': 'URL não fornecida'}), 400
 
     task_id = str(uuid.uuid4())
+
+    # Armazena cookies para esta tarefa
+    if cookies:
+        task_cookies[task_id] = cookies
+
     download_progress[task_id] = {
         'status': 'starting',
         'progress': 0,
@@ -302,6 +346,7 @@ def add_to_batch():
     """Adiciona múltiplas URLs à fila de download"""
     data = request.json
     urls = data.get('urls', [])
+    cookies = data.get('cookies', '')
 
     if not urls:
         return jsonify({'error': 'Nenhuma URL fornecida'}), 400
@@ -319,10 +364,14 @@ def add_to_batch():
         task_id = str(uuid.uuid4())
         url_type = detect_url_type(url)
 
+        # Armazena cookies para esta tarefa
+        if cookies:
+            task_cookies[task_id] = cookies
+
         # Tenta obter o título
         title = url
         try:
-            info = get_video_info(url)
+            info = get_video_info(url, cookies)
             title = info.get('title', url)
         except:
             pass

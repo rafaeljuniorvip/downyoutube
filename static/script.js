@@ -1,5 +1,68 @@
 const API_BASE = '';
 
+// ============ Cookies Management ============
+const COOKIES_STORAGE_KEY = 'yt_cookies';
+
+function getSavedCookies() {
+    return localStorage.getItem(COOKIES_STORAGE_KEY) || '';
+}
+
+function saveCookies(cookies) {
+    if (cookies) {
+        localStorage.setItem(COOKIES_STORAGE_KEY, cookies);
+    } else {
+        localStorage.removeItem(COOKIES_STORAGE_KEY);
+    }
+    updateCookiesIcon();
+}
+
+function updateCookiesIcon() {
+    const icon = document.getElementById('cookiesIcon');
+    const hasCookies = !!getSavedCookies();
+    icon.textContent = hasCookies ? '🔒' : '🔓';
+}
+
+// Initialize cookies UI
+document.addEventListener('DOMContentLoaded', () => {
+    const toggleBtn = document.getElementById('toggleCookies');
+    const cookiesConfig = document.getElementById('cookiesConfig');
+    const cookiesInput = document.getElementById('cookiesInput');
+    const saveCookiesBtn = document.getElementById('saveCookiesBtn');
+    const clearCookiesBtn = document.getElementById('clearCookiesBtn');
+    const cookiesStatus = document.getElementById('cookiesStatus');
+
+    // Load saved cookies
+    cookiesInput.value = getSavedCookies();
+    updateCookiesIcon();
+
+    // Toggle panel
+    toggleBtn.addEventListener('click', () => {
+        cookiesConfig.classList.toggle('hidden');
+    });
+
+    // Save cookies
+    saveCookiesBtn.addEventListener('click', () => {
+        const cookies = cookiesInput.value.trim();
+        saveCookies(cookies);
+        cookiesStatus.textContent = cookies ? 'Cookies salvos!' : 'Cookies removidos';
+        cookiesStatus.className = 'cookies-status success';
+        setTimeout(() => {
+            cookiesStatus.textContent = '';
+        }, 3000);
+    });
+
+    // Clear cookies
+    clearCookiesBtn.addEventListener('click', () => {
+        cookiesInput.value = '';
+        saveCookies('');
+        cookiesStatus.textContent = 'Cookies removidos';
+        cookiesStatus.className = 'cookies-status';
+        setTimeout(() => {
+            cookiesStatus.textContent = '';
+        }, 3000);
+    });
+});
+
 // Elementos do DOM - Single
 const urlInput = document.getElementById('urlInput');
 const fetchBtn = document.getElementById('fetchBtn');
@@ -91,7 +154,7 @@ async function fetchInfo() {
         const response = await fetch(`${API_BASE}/api/info`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
+            body: JSON.stringify({ url, cookies: getSavedCookies() })
         });
 
         const data = await response.json();
@@ -166,7 +229,7 @@ async function startDownload(type) {
         const response = await fetch(`${API_BASE}/api/download`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, type })
+            body: JSON.stringify({ url, type, cookies: getSavedCookies() })
         });
 
         const data = await response.json();
@@ -311,7 +374,7 @@ async function addToQueue() {
         const response = await fetch(`${API_BASE}/api/batch`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ urls })
+            body: JSON.stringify({ urls, cookies: getSavedCookies() })
         });
 
         const data = await response.json();

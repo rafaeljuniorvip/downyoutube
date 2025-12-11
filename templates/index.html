@@ -14,6 +14,37 @@
         </header>
 
         <main>
+            <!-- Cookies Config -->
+            <div class="cookies-section">
+                <button id="toggleCookies" class="btn btn-secondary btn-small">
+                    <span id="cookiesIcon">🔓</span> Configurar Cookies (opcional)
+                </button>
+                <div id="cookiesConfig" class="cookies-config hidden">
+                    <p class="cookies-help">
+                        Se o YouTube bloquear os downloads, você precisa fornecer seus cookies.
+                        <a href="https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp" target="_blank">Como obter?</a>
+                    </p>
+                    <ol class="cookies-steps">
+                        <li>Instale a extensão <a href="https://chrome.google.com/webstore/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank">Get cookies.txt LOCALLY</a></li>
+                        <li>Acesse youtube.com e faça login</li>
+                        <li>Clique na extensão e exporte os cookies</li>
+                        <li>Cole o conteúdo abaixo</li>
+                    </ol>
+                    <textarea
+                        id="cookiesInput"
+                        placeholder="# Netscape HTTP Cookie File
+.youtube.com	TRUE	/	TRUE	...
+..."
+                        rows="5"
+                    ></textarea>
+                    <div class="cookies-actions">
+                        <button id="saveCookiesBtn" class="btn btn-primary btn-small">Salvar Cookies</button>
+                        <button id="clearCookiesBtn" class="btn btn-secondary btn-small">Limpar</button>
+                        <span id="cookiesStatus" class="cookies-status"></span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tabs -->
             <div class="tabs">
                 <button class="tab active" data-tab="single">Download Simples</button>
