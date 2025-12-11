@@ -109,7 +109,7 @@ def download_single_video(url, task_id, output_path=None, cookies=None):
             output_path = str(DOWNLOAD_FOLDER)
 
         ydl_opts = {
-            'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]/best',
+            'format': 'ba/b',  # best audio, fallback to best
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -119,6 +119,7 @@ def download_single_video(url, task_id, output_path=None, cookies=None):
             'progress_hooks': [lambda d: progress_hook(d, task_id)],
             'quiet': True,
             'no_warnings': True,
+            'geo_bypass': True,
             **cookies_opts,
         }
 
