@@ -109,7 +109,7 @@ def download_single_video(url, task_id, output_path=None, cookies=None):
             output_path = str(DOWNLOAD_FOLDER)
 
         ydl_opts = {
-            'format': 'bestaudio/best',
+            'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best[height<=480]/best',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
