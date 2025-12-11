@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   downyoutube:
-    image: ghcr.io/${GITHUB_USER:-seu-usuario}/downyoutube:latest
+    image: ghcr.io/rafaeljuniorvip/downyoutube:latest
     networks:
       - traefik-public
     volumes:
