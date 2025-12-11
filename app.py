@@ -11,6 +11,8 @@ import io
 from pathlib import Path
 from queue import Queue
 from datetime import datetime
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, ID3NoHeaderError
 
 app = Flask(__name__)
 CORS(app)
@@ -494,16 +496,73 @@ def download_file(task_id):
     return send_file(filepath, as_attachment=True)
 
 
+def get_mp3_metadata(filepath):
+    """Extrai metadados de um arquivo MP3"""
+    metadata = {
+        'duration': None,
+        'title': None,
+        'artist': None,
+        'album': None,
+        'year': None,
+        'genre': None
+    }
+
+    try:
+        audio = MP3(filepath)
+        metadata['duration'] = int(audio.info.length) if audio.info.length else None
+
+        # Tenta ler tags ID3
+        try:
+            tags = ID3(filepath)
+
+            # TIT2 = Título
+            if 'TIT2' in tags:
+                metadata['title'] = str(tags['TIT2'])
+
+            # TPE1 = Artista principal
+            if 'TPE1' in tags:
+                metadata['artist'] = str(tags['TPE1'])
+
+            # TALB = Álbum
+            if 'TALB' in tags:
+                metadata['album'] = str(tags['TALB'])
+
+            # TDRC = Ano de gravação (ID3v2.4) ou TYER (ID3v2.3)
+            if 'TDRC' in tags:
+                metadata['year'] = str(tags['TDRC'])
+            elif 'TYER' in tags:
+                metadata['year'] = str(tags['TYER'])
+
+            # TCON = Gênero
+            if 'TCON' in tags:
+                metadata['genre'] = str(tags['TCON'])
+
+        except ID3NoHeaderError:
+            pass  # Arquivo não tem tags ID3
+
+    except Exception as e:
+        print(f"Erro ao ler metadados de {filepath}: {e}")
+
+    return metadata
+
+
 @app.route('/api/list-downloads')
 def list_downloads():
-    """Lista todos os arquivos baixados"""
+    """Lista todos os arquivos baixados com metadados"""
     files = []
     for f in DOWNLOAD_FOLDER.glob('*.mp3'):
-        files.append({
+        file_info = {
             'name': f.name,
             'size': f.stat().st_size,
             'modified': f.stat().st_mtime
-        })
+        }
+
+        # Adiciona metadados do MP3
+        metadata = get_mp3_metadata(f)
+        file_info.update(metadata)
+
+        files.append(file_info)
+
     return jsonify(files)
 
 
@@ -514,6 +573,15 @@ def download_existing(filename):
     if not filepath.exists():
         return jsonify({'error': 'Arquivo não encontrado'}), 404
     return send_file(filepath, as_attachment=True)
+
+
+@app.route('/api/stream/<filename>')
+def stream_file(filename):
+    """Faz streaming de um arquivo de áudio para reprodução"""
+    filepath = DOWNLOAD_FOLDER / filename
+    if not filepath.exists():
+        return jsonify({'error': 'Arquivo não encontrado'}), 404
+    return send_file(filepath, mimetype='audio/mpeg')
 
 
 @app.route('/api/download-zip/<task_id>')

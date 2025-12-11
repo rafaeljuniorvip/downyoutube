@@ -5,6 +5,180 @@
 const API_BASE = '';
 
 // ============================================
+// Audio Player
+// ============================================
+let audioPlayer = null;
+let currentPlaylist = [];
+let currentTrackIndex = 0;
+let isPlaying = false;
+
+function initAudioPlayer() {
+    audioPlayer = document.getElementById('audioElement');
+
+    // Event listeners do player
+    audioPlayer.addEventListener('timeupdate', updatePlayerProgress);
+    audioPlayer.addEventListener('loadedmetadata', updatePlayerDuration);
+    audioPlayer.addEventListener('ended', playNextTrack);
+    audioPlayer.addEventListener('play', () => {
+        isPlaying = true;
+        updatePlayButton();
+    });
+    audioPlayer.addEventListener('pause', () => {
+        isPlaying = false;
+        updatePlayButton();
+    });
+
+    // Controles do player
+    document.getElementById('playerPlayBtn').addEventListener('click', togglePlay);
+    document.getElementById('playerPrevBtn').addEventListener('click', playPrevTrack);
+    document.getElementById('playerNextBtn').addEventListener('click', playNextTrack);
+    document.getElementById('playerCloseBtn').addEventListener('click', closePlayer);
+
+    // Seek bar
+    document.getElementById('playerSeek').addEventListener('input', (e) => {
+        const seekTime = (e.target.value / 100) * audioPlayer.duration;
+        audioPlayer.currentTime = seekTime;
+    });
+
+    // Volume
+    document.getElementById('playerVolume').addEventListener('input', (e) => {
+        audioPlayer.volume = e.target.value / 100;
+        updateVolumeIcon();
+    });
+
+    document.getElementById('playerMuteBtn').addEventListener('click', toggleMute);
+}
+
+function playTrack(filename, playlist = null) {
+    // Se passou uma playlist, usa ela; senão cria uma com só essa música
+    if (playlist && playlist.length > 0) {
+        currentPlaylist = playlist;
+        currentTrackIndex = playlist.findIndex(f => f === filename);
+        if (currentTrackIndex === -1) currentTrackIndex = 0;
+    } else {
+        currentPlaylist = [filename];
+        currentTrackIndex = 0;
+    }
+
+    loadAndPlayCurrentTrack();
+}
+
+function loadAndPlayCurrentTrack() {
+    if (currentPlaylist.length === 0) return;
+
+    const filename = currentPlaylist[currentTrackIndex];
+    const streamUrl = `${API_BASE}/api/stream/${encodeURIComponent(filename)}`;
+
+    // Atualiza título (remove extensão .mp3)
+    const title = filename.replace(/\.mp3$/i, '');
+    document.getElementById('playerTitle').textContent = title;
+    document.getElementById('playerTitle').title = title;
+
+    // Carrega e toca
+    audioPlayer.src = streamUrl;
+    audioPlayer.play();
+
+    // Mostra o player
+    showPlayer();
+
+    // Destaca a música atual na tabela
+    highlightCurrentTrack(filename);
+}
+
+function showPlayer() {
+    document.getElementById('audioPlayer').classList.remove('hidden');
+    document.body.classList.add('player-active');
+}
+
+function closePlayer() {
+    audioPlayer.pause();
+    audioPlayer.src = '';
+    document.getElementById('audioPlayer').classList.add('hidden');
+    document.body.classList.remove('player-active');
+    currentPlaylist = [];
+    currentTrackIndex = 0;
+
+    // Remove destaque
+    document.querySelectorAll('.playing-row').forEach(el => el.classList.remove('playing-row'));
+}
+
+function togglePlay() {
+    if (audioPlayer.paused) {
+        audioPlayer.play();
+    } else {
+        audioPlayer.pause();
+    }
+}
+
+function updatePlayButton() {
+    const btn = document.getElementById('playerPlayBtn');
+    btn.textContent = isPlaying ? '⏸' : '▶';
+}
+
+function playNextTrack() {
+    if (currentPlaylist.length === 0) return;
+    currentTrackIndex = (currentTrackIndex + 1) % currentPlaylist.length;
+    loadAndPlayCurrentTrack();
+}
+
+function playPrevTrack() {
+    if (currentPlaylist.length === 0) return;
+    // Se já tocou mais de 3 segundos, volta ao início da música atual
+    if (audioPlayer.currentTime > 3) {
+        audioPlayer.currentTime = 0;
+        return;
+    }
+    currentTrackIndex = (currentTrackIndex - 1 + currentPlaylist.length) % currentPlaylist.length;
+    loadAndPlayCurrentTrack();
+}
+
+function updatePlayerProgress() {
+    if (!audioPlayer.duration) return;
+
+    const progress = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+    document.getElementById('playerSeek').value = progress;
+    document.getElementById('playerCurrentTime').textContent = formatTime(audioPlayer.currentTime);
+}
+
+function updatePlayerDuration() {
+    document.getElementById('playerDuration').textContent = formatTime(audioPlayer.duration);
+}
+
+function formatTime(seconds) {
+    if (!seconds || isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function toggleMute() {
+    audioPlayer.muted = !audioPlayer.muted;
+    updateVolumeIcon();
+}
+
+function updateVolumeIcon() {
+    const btn = document.getElementById('playerMuteBtn');
+    if (audioPlayer.muted || audioPlayer.volume === 0) {
+        btn.textContent = '🔇';
+    } else if (audioPlayer.volume < 0.5) {
+        btn.textContent = '🔉';
+    } else {
+        btn.textContent = '🔊';
+    }
+}
+
+function highlightCurrentTrack(filename) {
+    // Remove destaque anterior
+    document.querySelectorAll('.playing-row').forEach(el => el.classList.remove('playing-row'));
+
+    // Adiciona destaque na linha atual
+    document.querySelectorAll(`[data-filename="${filename}"]`).forEach(el => {
+        const row = el.closest('tr');
+        if (row) row.classList.add('playing-row');
+    });
+}
+
+// ============================================
 // Cookies Management
 // ============================================
 const COOKIES_STORAGE_KEY = 'yt_cookies';
@@ -353,11 +527,20 @@ async function loadQueue() {
         updateQueueTable(data.items);
         updateQueueBadge(data.items);
 
-        // Start polling if there are active items
-        const hasActive = data.items.some(item => ['queued', 'processing'].includes(item.status));
-        if (hasActive && !queueInterval) {
-            queueInterval = setInterval(loadQueue, 2000);
-        } else if (!hasActive && queueInterval) {
+        // Start polling if there are active items (mais frequente durante processamento)
+        const hasProcessing = data.items.some(item => item.status === 'processing');
+        const hasQueued = data.items.some(item => item.status === 'queued');
+
+        if (hasProcessing) {
+            // Polling rápido durante download
+            if (queueInterval) clearInterval(queueInterval);
+            queueInterval = setInterval(loadQueue, 1000);
+        } else if (hasQueued) {
+            // Polling mais lento quando só tem itens na fila
+            if (queueInterval) clearInterval(queueInterval);
+            queueInterval = setInterval(loadQueue, 3000);
+        } else if (queueInterval) {
+            // Para o polling quando não tem mais itens ativos
             clearInterval(queueInterval);
             queueInterval = null;
         }
@@ -384,27 +567,133 @@ function updateQueueTable(items) {
     const tbody = document.getElementById('queueTableBody');
 
     if (items.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum item na fila</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum item na fila</td></tr>';
         return;
     }
 
     tbody.innerHTML = items.map(item => {
-        const progressHtml = item.status === 'processing' ?
-            `<div class="progress-bar-container" style="height: 4px;">
-                <div class="progress-bar" style="width: ${Math.round(item.progress || 0)}%"></div>
-            </div>
-            <small>${Math.round(item.progress || 0)}%</small>` :
-            `<small>${item.status}</small>`;
+        let progressHtml = '';
+        let statusText = '';
+
+        switch (item.status) {
+            case 'processing':
+                const percent = Math.round(item.progress || 0);
+                let progressDetail = `${percent}%`;
+                if (item.current_video && item.total) {
+                    progressDetail = `${item.current_index}/${item.total} - ${percent}%`;
+                }
+                progressHtml = `
+                    <div class="queue-progress">
+                        <div class="progress-bar-container" style="height: 6px; margin-bottom: 4px;">
+                            <div class="progress-bar" style="width: ${percent}%"></div>
+                        </div>
+                        <small class="progress-detail">${progressDetail}</small>
+                        ${item.current_video ? `<small class="current-video" title="${item.current_video}">♫ ${truncateText(item.current_video, 30)}</small>` : ''}
+                    </div>`;
+                statusText = 'Baixando';
+                break;
+            case 'queued':
+                progressHtml = '<small class="text-muted">Aguardando...</small>';
+                statusText = 'Na fila';
+                break;
+            case 'completed':
+                progressHtml = '<small class="text-success">✓ Concluído</small>';
+                statusText = 'Completo';
+                break;
+            case 'error':
+                progressHtml = `<small class="text-danger" title="${item.error || 'Erro desconhecido'}">✗ Erro</small>`;
+                statusText = 'Erro';
+                break;
+            case 'cancelled':
+                progressHtml = '<small class="text-muted">Cancelado</small>';
+                statusText = 'Cancelado';
+                break;
+            default:
+                progressHtml = `<small>${item.status}</small>`;
+                statusText = item.status;
+        }
+
+        // Botões de ação baseados no status
+        let actionsHtml = '';
+        if (item.status === 'queued') {
+            actionsHtml = `<button class="btn btn-sm btn-danger" onclick="removeFromQueue('${item.task_id}')" title="Remover da fila">✗</button>`;
+        } else if (item.status === 'processing') {
+            actionsHtml = `<button class="btn btn-sm btn-outline" disabled title="Em andamento...">⏳</button>`;
+        } else if (item.status === 'completed') {
+            if (item.type === 'video') {
+                // Para vídeos únicos, mostrar botão de play
+                actionsHtml = `
+                    <button class="btn btn-sm btn-play" onclick="playQueueItem('${item.task_id}')" title="Tocar">▶</button>
+                    <button class="btn btn-sm btn-primary" onclick="downloadQueueItem('${item.task_id}', '${item.type}')" title="Baixar">⬇</button>`;
+            } else {
+                // Para playlists, só download
+                actionsHtml = `<button class="btn btn-sm btn-primary" onclick="downloadQueueItem('${item.task_id}', '${item.type}')" title="Baixar ZIP">⬇</button>`;
+            }
+        } else {
+            actionsHtml = `<button class="btn btn-sm btn-outline" onclick="removeFromQueue('${item.task_id}')" title="Remover">🗑</button>`;
+        }
 
         return `
-            <tr>
-                <td><span class="status-dot ${item.status}"></span></td>
-                <td>${item.title}</td>
-                <td><span class="badge badge-${item.type === 'playlist' ? 'info' : 'success'}">${item.type}</span></td>
+            <tr class="queue-item queue-item-${item.status}" data-task-id="${item.task_id}">
+                <td><span class="status-dot ${item.status}" title="${statusText}"></span></td>
+                <td class="queue-title" title="${item.title}">${truncateText(item.title, 50)}</td>
+                <td><span class="badge badge-${item.type === 'playlist' ? 'info' : 'success'}">${item.type === 'playlist' ? 'Lista' : 'Música'}</span></td>
                 <td>${progressHtml}</td>
+                <td class="table-actions">${actionsHtml}</td>
             </tr>
         `;
     }).join('');
+}
+
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+}
+
+async function removeFromQueue(taskId) {
+    try {
+        const response = await fetch(`${API_BASE}/api/queue/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            alert(data.error || 'Erro ao remover item');
+            return;
+        }
+
+        // Atualiza a fila
+        loadQueue();
+    } catch (error) {
+        console.error('Remove from queue error:', error);
+        alert('Erro ao remover item da fila');
+    }
+}
+
+async function downloadQueueItem(taskId, itemType) {
+    if (itemType === 'playlist') {
+        window.location.href = `${API_BASE}/api/download-zip/${taskId}`;
+    } else {
+        window.location.href = `${API_BASE}/api/download-file/${taskId}`;
+    }
+}
+
+async function playQueueItem(taskId) {
+    try {
+        // Busca o progresso para obter o nome do arquivo
+        const response = await fetch(`${API_BASE}/api/progress/${taskId}`);
+        const data = await response.json();
+
+        if (data.filename) {
+            playTrack(data.filename, libraryFiles);
+        } else {
+            console.error('Arquivo não encontrado para esta tarefa');
+        }
+    } catch (error) {
+        console.error('Erro ao reproduzir item da fila:', error);
+    }
 }
 
 function updateQueueBadge(items) {
@@ -427,6 +716,7 @@ async function clearQueue() {
 // Library Section
 // ============================================
 let selectedFiles = new Set();
+let libraryFiles = []; // Lista de arquivos para o player
 
 async function loadLibrary() {
     try {
@@ -434,6 +724,13 @@ async function loadLibrary() {
         const files = await response.json();
 
         document.getElementById('totalFiles').textContent = files.length;
+
+        // Sort by modified date (newest first)
+        files.sort((a, b) => b.modified - a.modified);
+
+        // Salva a lista para o player
+        libraryFiles = files.map(f => f.name);
+
         updateLibraryTable(files);
     } catch (error) {
         console.error('Library error:', error);
@@ -444,29 +741,63 @@ function updateLibraryTable(files) {
     const tbody = document.getElementById('libraryTableBody');
 
     if (files.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Nenhum arquivo baixado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Nenhum arquivo baixado</td></tr>';
+        libraryFiles = [];
         return;
     }
 
-    // Sort by modified date (newest first)
-    files.sort((a, b) => b.modified - a.modified);
+    tbody.innerHTML = files.map(file => {
+        const escapedName = file.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
-    tbody.innerHTML = files.map(file => `
-        <tr>
+        // Título: usa tag ID3 ou nome do arquivo sem extensão
+        const displayTitle = file.title || file.name.replace(/\.mp3$/i, '');
+
+        // Artista e informações adicionais
+        let artistInfo = file.artist || '';
+        let extraInfo = [];
+        if (file.album) extraInfo.push(file.album);
+        if (file.year) extraInfo.push(file.year);
+        if (file.genre) extraInfo.push(file.genre);
+
+        // Duração formatada
+        const durationStr = file.duration ? formatDuration(file.duration) : '--:--';
+
+        // Tooltip com todas as informações
+        let tooltipParts = [file.name];
+        if (file.title) tooltipParts.push(`Título: ${file.title}`);
+        if (file.artist) tooltipParts.push(`Artista: ${file.artist}`);
+        if (file.album) tooltipParts.push(`Álbum: ${file.album}`);
+        if (file.year) tooltipParts.push(`Ano: ${file.year}`);
+        if (file.genre) tooltipParts.push(`Gênero: ${file.genre}`);
+        const tooltip = tooltipParts.join('\n');
+
+        return `
+        <tr data-filename="${file.name}">
             <td><input type="checkbox" class="file-checkbox" data-filename="${file.name}"></td>
-            <td>${file.name}</td>
-            <td>${formatFileSize(file.size)}</td>
+            <td class="library-title-cell" title="${tooltip}">
+                <div class="library-title">${truncateText(displayTitle, 45)}</div>
+                ${extraInfo.length > 0 ? `<div class="library-extra">${truncateText(extraInfo.join(' • '), 50)}</div>` : ''}
+            </td>
+            <td class="library-artist">${truncateText(artistInfo, 25) || '<span class="text-muted">-</span>'}</td>
+            <td class="library-duration">${durationStr}</td>
+            <td class="library-size">${formatFileSize(file.size)}</td>
             <td class="table-actions">
-                <button class="btn btn-sm btn-primary" onclick="downloadExisting('${file.name}')">Baixar</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteFile('${file.name}')">Deletar</button>
+                <button class="btn btn-sm btn-play" onclick="playFromLibrary('${escapedName}')" title="Tocar">▶</button>
+                <button class="btn btn-sm btn-primary" onclick="downloadExisting('${escapedName}')" title="Baixar">⬇</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteFile('${escapedName}')" title="Deletar">🗑</button>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 
     // Add checkbox listeners
     document.querySelectorAll('.file-checkbox').forEach(cb => {
         cb.addEventListener('change', updateSelectedFiles);
     });
+}
+
+function playFromLibrary(filename) {
+    // Toca a música passando a playlist completa da biblioteca
+    playTrack(filename, libraryFiles);
 }
 
 function updateSelectedFiles() {
@@ -643,7 +974,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveCookiesBtn').addEventListener('click', savePanelCookies);
     document.getElementById('clearCookiesBtn').addEventListener('click', clearPanelCookies);
 
+    // Library section - Play all button
+    document.getElementById('playAllBtn').addEventListener('click', () => {
+        if (libraryFiles.length > 0) {
+            playTrack(libraryFiles[0], libraryFiles);
+        }
+    });
+
     // Initialize
+    initAudioPlayer();
     updateCookiesIcon();
     loadLibrary();
     loadQueue();

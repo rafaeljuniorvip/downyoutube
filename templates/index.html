@@ -2,9 +2,12 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DownYouTube - Gerenciador de Downloads</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0D1321">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Ponto VIP Music - Papelaria Ponto VIP</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
 </head>
 <body>
     <div class="app-container">
@@ -12,8 +15,8 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <span class="logo-icon">▶</span>
-                    <span class="logo-text">DownYouTube</span>
+                    <span class="logo-icon">♪</span>
+                    <span class="logo-text">Ponto</span>
                 </div>
             </div>
             <nav class="sidebar-nav">
@@ -22,17 +25,17 @@
                     <span class="nav-text">Novo Download</span>
                 </a>
                 <a href="#" class="nav-item" data-section="queue">
-                    <span class="nav-icon">☰</span>
-                    <span class="nav-text">Fila de Downloads</span>
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-text">Fila</span>
                     <span class="nav-badge" id="queueBadge">0</span>
                 </a>
                 <a href="#" class="nav-item" data-section="library">
-                    <span class="nav-icon">♫</span>
-                    <span class="nav-text">Biblioteca</span>
+                    <span class="nav-icon">🎵</span>
+                    <span class="nav-text">Musicas</span>
                 </a>
                 <a href="#" class="nav-item" data-section="settings">
                     <span class="nav-icon">⚙</span>
-                    <span class="nav-text">Configuracoes</span>
+                    <span class="nav-text">Ajustes</span>
                 </a>
             </nav>
             <div class="sidebar-footer">
@@ -234,18 +237,19 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="table-container">
+                        <div class="table-container queue-table-container">
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th width="50">Status</th>
+                                        <th width="40">Status</th>
                                         <th>Titulo</th>
-                                        <th width="80">Tipo</th>
-                                        <th width="150">Progresso</th>
+                                        <th width="70">Tipo</th>
+                                        <th width="180">Progresso</th>
+                                        <th width="80">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody id="queueTableBody">
-                                    <tr><td colspan="4" class="text-center text-muted">Nenhum item na fila</td></tr>
+                                    <tr><td colspan="5" class="text-center text-muted">Nenhum item na fila</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -259,8 +263,11 @@
                     <div class="card-header">
                         <h2 class="card-title">Biblioteca de Arquivos</h2>
                         <div class="card-actions">
+                            <button id="playAllBtn" class="btn btn-sm btn-play">
+                                ▶ Tocar Todas
+                            </button>
                             <button id="downloadSelectedBtn" class="btn btn-sm btn-primary" disabled>
-                                Baixar Selecionados (ZIP)
+                                Baixar Selecionados
                             </button>
                             <button id="deleteSelectedBtn" class="btn btn-sm btn-danger" disabled>
                                 Deletar Selecionados
@@ -268,18 +275,20 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="table-container">
-                            <table class="table">
+                        <div class="table-container library-table-container">
+                            <table class="table library-table">
                                 <thead>
                                     <tr>
                                         <th width="40"><input type="checkbox" id="selectAllFiles"></th>
-                                        <th>Nome do Arquivo</th>
-                                        <th width="100">Tamanho</th>
-                                        <th width="150">Acoes</th>
+                                        <th>Titulo / Arquivo</th>
+                                        <th>Artista</th>
+                                        <th width="70">Duracao</th>
+                                        <th width="80">Tamanho</th>
+                                        <th width="120">Acoes</th>
                                     </tr>
                                 </thead>
                                 <tbody id="libraryTableBody">
-                                    <tr><td colspan="4" class="text-center text-muted">Nenhum arquivo baixado</td></tr>
+                                    <tr><td colspan="6" class="text-center text-muted">Nenhum arquivo baixado</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -322,13 +331,36 @@
                         <h2 class="card-title">Sobre</h2>
                     </div>
                     <div class="card-body">
-                        <p><strong>DownYouTube</strong> - Gerenciador de Downloads de Audio</p>
-                        <p class="text-muted">Ferramenta para download de videos e playlists do YouTube em formato MP3.</p>
+                        <p><strong>Ponto VIP Music</strong> - Gerenciador de Downloads de Audio</p>
+                        <p class="text-muted">Ferramenta exclusiva da Papelaria Ponto VIP para download de videos e playlists do YouTube em formato MP3.</p>
                         <p class="text-muted mt-2">Feito para uso pessoal. Respeite os direitos autorais.</p>
                     </div>
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Audio Player -->
+    <div id="audioPlayer" class="audio-player hidden">
+        <div class="player-info">
+            <span class="player-title" id="playerTitle">Nenhuma música</span>
+        </div>
+        <div class="player-controls">
+            <button class="player-btn" id="playerPrevBtn" title="Anterior">⏮</button>
+            <button class="player-btn player-btn-main" id="playerPlayBtn" title="Play/Pause">▶</button>
+            <button class="player-btn" id="playerNextBtn" title="Próxima">⏭</button>
+        </div>
+        <div class="player-progress">
+            <span class="player-time" id="playerCurrentTime">0:00</span>
+            <input type="range" class="player-seek" id="playerSeek" min="0" max="100" value="0">
+            <span class="player-time" id="playerDuration">0:00</span>
+        </div>
+        <div class="player-volume">
+            <button class="player-btn" id="playerMuteBtn" title="Mudo">🔊</button>
+            <input type="range" class="player-volume-slider" id="playerVolume" min="0" max="100" value="100">
+        </div>
+        <button class="player-btn player-close" id="playerCloseBtn" title="Fechar">✕</button>
+        <audio id="audioElement"></audio>
     </div>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
